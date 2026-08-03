@@ -1,0 +1,116 @@
+# ============================================================================
+# DIFFICULTY: EASY
+# Scenario: Internal IT Knowledge Base Assistant
+#
+# What this proves:
+#   - The simplest realistic agent that still passes every schema AND
+#     policy rule: one capability, one read-only tool, no PII, no write
+#     side effects, no autonomy ceiling.
+#   - Because nothing here triggers a policy rule, humanInLoop is entirely
+#     absent from the spec -- proving optional/conditional sections work.
+#   - requires_human_approval in the generated IR should come out FALSE.
+# ============================================================================
+
+specVersion: "0.1"
+
+info:
+  name: it-kb-assistant
+  version: 1.0.0
+  owner: it-platform-team
+  description: >-
+    Answers employee questions about IT policies, software requests, and
+    troubleshooting steps by searching the internal IT knowledge base.
+    Read-only -- never modifies tickets, accounts, or systems.
+  lifecycle: pilot
+  tags: [it-support, knowledge-base, internal]
+
+capabilities:
+  - id: answer-it-question
+    description: >-
+      Answer an employee's IT question using only content retrieved from
+      the internal knowledge base, citing the source article.
+    inputs:
+      type: object
+      required: [question]
+      properties:
+        question: { type: string, description: "The employee's free-text question" }
+        employeeId: { type: string, description: "Optional, for scoping to their device/OS" }
+    outputs:
+      type: object
+      required: [answer, sourceArticleId]
+      properties:
+        answer: { type: string }
+        sourceArticleId: { type: string }
+        confidence: { type: number }
+    scopeBoundaries: >-
+      Does not answer HR, payroll, or benefits questions. Does not reset
+      passwords, create tickets, or take any action -- informational only.
+    examples:
+      - input: { question: "How do I connect to the VPN on a Mac?" }
+        output: { answer: "Install GlobalProtect from Self Service...", sourceArticleId: "KB-1042" }
+
+tools:
+  - id: search-knowledge-base
+    type: mcp
+    description: Full-text search over the internal IT knowledge base.
+    schema:
+      type: object
+      required: [query]
+      properties:
+        query: { type: string }
+        maxResults: { type: integer, default: 5 }
+    sideEffects: read
+    authRef: kb-read
+    timeoutMs: 8000
+    rateLimit:
+      maxCalls: 60
+      perSeconds: 60
+
+dataContracts:
+  - source: it-knowledge-base
+    classification: internal
+    allowedOperations: [read]
+    retention: 0d
+    piiPresent: false
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  parameters: { temperature: 0.1, maxTokens: 800 }
+  promptTemplateRef: prompts/it-kb-assistant.md
+  planningStrategy: single-shot
+
+guardrails:
+  contentPolicies: [no-account-changes, no-medical-legal-financial-advice]
+  refusalConditions: [question_outside_it_scope, request_for_password_reset]
+
+auth:
+  identityRef: svc-it-kb-assistant
+  credentialsRef: secretsmanager://it-kb-assistant/creds
+  scopesPerTool:
+    search-knowledge-base: [kb:read]
+
+observability:
+  logging:
+    level: info
+    destination: central-log-pipeline
+    fields: [employee_id, query, source_article_id]
+  tracing:
+    enabled: true
+    propagation: w3c-tracecontext
+  metrics: [latency_ms, kb_hit_rate, no_answer_rate]
+  evalSuiteRef: evals/it-kb-assistant.yaml
+
+errorHandling:
+  onToolFailure: fallback
+  onTimeout: fallback
+  onLowConfidence: fallback
+  fallbackResponse: >-
+    I couldn't find a confident answer in the knowledge base. Please open
+    a ticket with the IT Help Desk for further assistance.
+  confidenceThreshold: 0.55
+
+deployment:
+  environments: [dev, staging, production]
+  rolloutStrategy: direct
+  changeHistoryRef: registry/it-kb-assistant/CHANGELOG.md

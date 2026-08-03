@@ -1,0 +1,278 @@
+# ============================================================================
+# DIFFICULTY: HARD
+# Scenario: Fraud Investigation & Case Management Agent (production banking)
+#
+# What this proves, beyond the medium spec:
+#   - Four capabilities, four tools spanning mcp AND http types, and every
+#     sideEffects value including "irreversible".
+#   - A dataContract with classification: restricted, which triggers policy
+#     rule "restricted-data-requires-approved-provider" -- model.provider
+#     must be on the approved list, and it is (internal-model-gateway).
+#   - info.lifecycle: production, which triggers policy rule "production-
+#     requires-deployment-approval" -- deployment.approvalRequired: true
+#     is present and satisfies it.
+#   - memory.type: long-term with a persistenceRef (vs. the medium spec's
+#     session memory) and maxSizeKb.
+#   - model.fallbackModel, plan-execute strategy, and a real
+#     confidenceThreshold + onLowConfidence: abstain combination.
+#   - Two tools with rateLimit + retryPolicy simultaneously, and a third
+#     with sideEffects: irreversible (the highest-risk category) --
+#     multiple independent reasons requiresHumanApproval must be true.
+#   - Multiple dataContracts with different classifications/retentions.
+#   - guardrails.businessRules with several named rules, plus
+#     maxAutonomySteps AND piiHandling both present simultaneously.
+#   - Full observability (structured logging fields, tracing, several
+#     metrics) and errorHandling with every enum value exercised.
+#   - deployment.rolloutStrategy: canary across dev/staging/production
+#     with a compatibility floor and a real changeHistoryRef.
+# ============================================================================
+
+specVersion: "0.1"
+
+info:
+  name: fraud-investigation-agent
+  version: 2.3.1
+  owner: fraud-risk-engineering
+  description: >-
+    Assists fraud analysts investigating flagged transactions: gathers
+    transaction history and risk signals, drafts a case narrative, and
+    recommends a disposition. All account actions (freezes, holds,
+    escalations) require analyst approval before execution.
+  lifecycle: production
+  tags: [fraud, risk, case-management, regulated]
+
+capabilities:
+  - id: summarize-alert
+    description: >-
+      Summarize a fraud-detection alert in plain language for the
+      assigned analyst, including why it fired and its severity.
+    inputs:
+      type: object
+      required: [alertId]
+      properties:
+        alertId: { type: string }
+    outputs:
+      type: object
+      required: [alertId, summary, severity]
+      properties:
+        alertId: { type: string }
+        summary: { type: string }
+        severity: { type: string }
+    scopeBoundaries: Summarization only -- does not determine disposition.
+
+  - id: gather-evidence
+    description: >-
+      Pull transaction history and the customer's current risk profile
+      relevant to the flagged alert into a single evidence packet.
+    inputs:
+      type: object
+      required: [alertId, customerId]
+      properties:
+        alertId: { type: string }
+        customerId: { type: string }
+    outputs:
+      type: object
+      required: [alertId, transactions, riskProfile]
+      properties:
+        alertId: { type: string }
+        transactions: { type: array }
+        riskProfile: { type: object }
+
+  - id: draft-case-narrative
+    description: >-
+      Draft a written case narrative from gathered evidence, in the
+      format required for the case management system.
+    inputs:
+      type: object
+      required: [alertId, transactions, riskProfile]
+      properties:
+        alertId: { type: string }
+        transactions: { type: array }
+        riskProfile: { type: object }
+    outputs:
+      type: object
+      required: [alertId, narrative]
+      properties:
+        alertId: { type: string }
+        narrative: { type: string }
+    examples:
+      - input: { alertId: "ALRT-88213", transactions: [], riskProfile: {} }
+        output: { alertId: "ALRT-88213", narrative: "Customer's account shows..." }
+
+  - id: recommend-disposition
+    description: >-
+      Recommend a disposition (e.g. escalate, monitor, close) for the
+      case, with a confidence score and supporting rationale. Does not
+      execute the disposition.
+    inputs:
+      type: object
+      required: [alertId, narrative]
+      properties:
+        alertId: { type: string }
+        narrative: { type: string }
+    outputs:
+      type: object
+      required: [alertId, recommendation, confidence]
+      properties:
+        alertId: { type: string }
+        recommendation: { type: string }
+        confidence: { type: number }
+    scopeBoundaries: >-
+      A recommendation only. Escalation and account actions require a
+      human analyst to invoke them explicitly.
+
+tools:
+  - id: get-transaction-history
+    type: mcp
+    description: Retrieve a customer's transaction history for a lookback window.
+    schema:
+      type: object
+      required: [customerId, lookbackDays]
+      properties:
+        customerId: { type: string }
+        lookbackDays: { type: integer }
+    sideEffects: read
+    authRef: fraud-read
+    timeoutMs: 8000
+    rateLimit:
+      maxCalls: 100
+      perSeconds: 60
+    retryPolicy:
+      maxRetries: 3
+      backoff: exponential
+
+  - id: get-customer-risk-profile
+    type: http
+    description: Retrieve the customer's current composite risk score and signals.
+    schema:
+      type: object
+      required: [customerId]
+      properties:
+        customerId: { type: string }
+    sideEffects: read
+    authRef: risk-read
+    timeoutMs: 5000
+    rateLimit:
+      maxCalls: 120
+      perSeconds: 60
+
+  - id: create-case-record
+    type: mcp
+    description: Create a new case record in the case management system.
+    schema:
+      type: object
+      required: [alertId, narrative, recommendation]
+      properties:
+        alertId: { type: string }
+        narrative: { type: string }
+        recommendation: { type: string }
+    sideEffects: write
+    authRef: case-write
+    timeoutMs: 12000
+    retryPolicy:
+      maxRetries: 2
+      backoff: fixed
+
+  - id: escalate-to-investigator
+    type: http
+    description: >-
+      Escalate the case to a senior fraud investigator queue. This action
+      cannot be automatically undone once the queue routes the case.
+    schema:
+      type: object
+      required: [alertId, priority]
+      properties:
+        alertId: { type: string }
+        priority: { type: string }
+    sideEffects: irreversible
+    authRef: case-escalate
+    timeoutMs: 10000
+
+dataContracts:
+  - source: core-banking-crm
+    classification: confidential
+    allowedOperations: [read]
+    retention: 90d
+    fields: [customerId, transactions, accountStatus]
+    piiPresent: true
+
+  - source: fraud-case-management-system
+    classification: restricted
+    allowedOperations: [read, write]
+    retention: 2555d
+    fields: [alertId, caseId, narrative, disposition]
+    piiPresent: true
+
+  - source: customer-risk-signals
+    classification: confidential
+    allowedOperations: [read]
+    retention: 365d
+    piiPresent: false
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2-large
+  parameters: { temperature: 0.1, maxTokens: 3000, topP: 0.9 }
+  promptTemplateRef: prompts/fraud-investigation.md
+  planningStrategy: plan-execute
+  fallbackModel: enterprise-llm-v1-stable
+
+memory:
+  type: long-term
+  scope: case-id
+  ttl: 2555d
+  persistenceRef: store://fraud-case-memory
+  maxSizeKb: 512
+
+guardrails:
+  contentPolicies: [no-account-freeze-without-approval, no-customer-contact, confidentiality-required]
+  businessRules:
+    [
+      escalation_requires_severity_high_or_critical,
+      dual_control_over_10000_usd,
+      narrative_must_cite_evidence_source,
+    ]
+  refusalConditions: [request_to_execute_account_action, request_outside_fraud_scope, request_for_unmasked_pii]
+  maxAutonomySteps: 8
+  piiHandling: mask
+
+auth:
+  identityRef: svc-fraud-investigation-agent
+  credentialsRef: secretsmanager://fraud-investigation-agent/creds
+  scopesPerTool:
+    get-transaction-history: [fraud:read, txn:read]
+    get-customer-risk-profile: [risk:read]
+    create-case-record: [case:write]
+    escalate-to-investigator: [case:escalate]
+  tokenLifetimeSeconds: 900
+
+humanInLoop:
+  checkpoints: [before_case_record_created, before_escalation]
+  escalationPath: team:fraud-senior-investigators
+  overrideAuthority: role:fraud-team-lead
+  approvalTimeoutBehavior: abort
+
+observability:
+  logging:
+    level: info
+    destination: central-log-pipeline
+    fields: [alert_id, case_id, customer_id_hash, tool_id, disposition]
+  tracing:
+    enabled: true
+    propagation: w3c-tracecontext
+  metrics: [latency_ms, tool_error_rate, checkpoint_wait_time_ms, escalation_rate, false_positive_rate]
+  evalSuiteRef: evals/fraud-investigation-agent.yaml
+
+errorHandling:
+  onToolFailure: escalate
+  onTimeout: escalate
+  onLowConfidence: abstain
+  fallbackResponse: "Unable to reach a confident recommendation -- case routed to a senior investigator."
+  confidenceThreshold: 0.75
+
+deployment:
+  environments: [dev, staging, production]
+  rolloutStrategy: canary
+  compatibility: ">=0.1"
+  changeHistoryRef: registry/fraud-investigation-agent/CHANGELOG.md
+  approvalRequired: true

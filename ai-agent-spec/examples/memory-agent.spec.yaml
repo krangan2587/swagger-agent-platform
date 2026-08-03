@@ -1,0 +1,64 @@
+# Schema-valid AND policy-compliant. Declares memory, unlike the other
+# fixtures -- used to prove the memory_store.py.j2 template only renders
+# when ir.memory is not None.
+
+specVersion: "0.1"
+
+info:
+  name: memory-agent
+  version: 0.1.0
+  owner: some-team
+  description: A read-only agent that keeps session-scoped memory
+  lifecycle: pilot
+
+capabilities:
+  - id: read-thing
+    description: Reads something, remembering prior turns in the session
+    inputs: { type: object }
+    outputs: { type: object }
+
+tools:
+  - id: get-thing
+    type: mcp
+    description: Reads a thing
+    schema: { type: object }
+    sideEffects: read
+
+dataContracts: []
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  promptTemplateRef: prompts/memory-agent.md
+  planningStrategy: single-shot
+
+memory:
+  type: session
+  scope: user-id
+  ttl: 1h
+
+guardrails:
+  contentPolicies: []
+  refusalConditions: []
+
+auth:
+  identityRef: svc-memory-agent
+  credentialsRef: secretsmanager://memory-agent/creds
+  scopesPerTool:
+    get-thing: [read:scope]
+
+observability:
+  logging: { level: info, destination: central-log-pipeline }
+  tracing: { enabled: true }
+  metrics: []
+  evalSuiteRef: evals/x.yaml
+
+errorHandling:
+  onToolFailure: abort
+  onTimeout: abort
+  onLowConfidence: abstain
+
+deployment:
+  environments: [dev]
+  rolloutStrategy: direct
+  changeHistoryRef: registry/memory-agent/CHANGELOG.md

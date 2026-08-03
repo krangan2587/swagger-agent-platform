@@ -1,0 +1,59 @@
+# Schema-valid AND policy-compliant. Used to prove the IR Builder's
+# requires_human_approval derived field is correctly False here: no
+# write/irreversible tools, and no guardrails.maxAutonomySteps ceiling.
+
+specVersion: "0.1"
+
+info:
+  name: read-only-agent
+  version: 0.1.0
+  owner: some-team
+  description: A read-only agent with no autonomy ceiling and no write tools
+  lifecycle: pilot
+
+capabilities:
+  - id: read-thing
+    description: Reads something
+    inputs: { type: object }
+    outputs: { type: object }
+
+tools:
+  - id: get-thing
+    type: mcp
+    description: Reads a thing
+    schema: { type: object }
+    sideEffects: read
+
+dataContracts: []
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  promptTemplateRef: prompts/x.md
+  planningStrategy: single-shot
+
+guardrails:
+  contentPolicies: []
+  refusalConditions: []
+
+auth:
+  identityRef: svc-read-only-agent
+  credentialsRef: secretsmanager://read-only-agent/creds
+  scopesPerTool:
+    get-thing: [read:scope]
+
+observability:
+  logging: { level: info, destination: central-log-pipeline }
+  tracing: { enabled: true }
+  metrics: []
+  evalSuiteRef: evals/x.yaml
+
+errorHandling:
+  onToolFailure: abort
+  onTimeout: abort
+  onLowConfidence: abstain
+
+deployment:
+  environments: [dev]
+  rolloutStrategy: direct
+  changeHistoryRef: registry/read-only-agent/CHANGELOG.md

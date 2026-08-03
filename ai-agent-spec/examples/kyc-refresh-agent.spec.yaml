@@ -1,0 +1,96 @@
+specVersion: "0.1"
+
+info:
+  name: kyc-refresh-agent
+  version: 1.2.0
+  owner: retail-banking-platform
+  description: Assists analysts in refreshing customer KYC records
+  lifecycle: pilot
+  tags: [kyc, retail-banking]
+
+capabilities:
+  - id: summarize-kyc-gaps
+    description: Identify missing or expired KYC fields for a customer
+    inputs: { type: object }
+    outputs: { type: object }
+  - id: draft-outreach-note
+    description: Draft a customer outreach note listing required documents
+    inputs: { type: object }
+    outputs: { type: object }
+
+tools:
+  - id: get-customer-profile
+    type: mcp
+    description: Retrieve a customer's current KYC record
+    schema: { type: object }
+    sideEffects: read
+    authRef: kyc-read
+  - id: update-kyc-record
+    type: mcp
+    description: Write a proposed KYC field update for analyst approval
+    schema: { type: object }
+    sideEffects: write
+    authRef: kyc-write
+    timeoutMs: 15000
+    retryPolicy: { maxRetries: 2, backoff: exponential }
+
+dataContracts:
+  - source: core-banking-crm
+    classification: confidential
+    allowedOperations: [read]
+    retention: 90d
+    piiPresent: true
+  - source: kyc-document-store
+    classification: restricted
+    allowedOperations: [read, write]
+    retention: 365d
+    piiPresent: true
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  parameters: { temperature: 0.2, maxTokens: 1500 }
+  promptTemplateRef: prompts/kyc-refresh.md
+  planningStrategy: plan-execute
+
+memory:
+  type: session
+  scope: case-id
+  ttl: 24h
+
+guardrails:
+  contentPolicies: [no-financial-advice, no-legal-advice]
+  refusalConditions: [request_outside_kyc_scope]
+  maxAutonomySteps: 6
+  piiHandling: mask
+
+auth:
+  identityRef: svc-kyc-refresh-agent
+  credentialsRef: secretsmanager://kyc-refresh-agent/creds
+  scopesPerTool:
+    get-customer-profile: [kyc:read]
+    update-kyc-record: [kyc:write]
+
+humanInLoop:
+  checkpoints: [before_record_update]
+  escalationPath: team:kyc-ops
+  overrideAuthority: role:compliance-officer
+  approvalTimeoutBehavior: block
+
+observability:
+  logging: { level: info, destination: central-log-pipeline, fields: [case_id, tool_id] }
+  tracing: { enabled: true, propagation: w3c-tracecontext }
+  metrics: [latency_ms, tool_error_rate, checkpoint_wait_time]
+  evalSuiteRef: evals/kyc-refresh-agent.yaml
+
+errorHandling:
+  onToolFailure: escalate
+  onTimeout: retry
+  onLowConfidence: abstain
+  confidenceThreshold: 0.6
+
+deployment:
+  environments: [dev, staging, production]
+  rolloutStrategy: canary
+  changeHistoryRef: registry/kyc-refresh-agent/CHANGELOG.md
+  approvalRequired: true

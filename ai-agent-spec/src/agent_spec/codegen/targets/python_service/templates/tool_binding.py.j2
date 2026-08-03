@@ -1,0 +1,35 @@
+"""Generated tool binding for '{{ tool.id }}'.
+
+DO NOT EDIT BY HAND -- generated from the agent spec by the Template Engine
+(Stage 4, target: python-service). Re-run the generator instead.
+
+Your real implementation goes in src/impl/tools/{{ tool.id | snake_case }}.py,
+NOT here. That file is scaffolded once and never overwritten by the
+generator -- this file just wires the declared contract (schema, auth
+scopes, timeout, retry policy) to whatever you put there.
+"""
+
+from __future__ import annotations
+
+from src.impl.tools import {{ tool.id | snake_case }} as _impl
+
+TOOL_ID = "{{ tool.id }}"
+TOOL_TYPE = "{{ tool.type }}"
+SIDE_EFFECTS = "{{ tool.side_effects }}"
+TIMEOUT_MS = {{ tool.timeout_ms }}
+AUTH_SCOPES = {{ tool.auth_scopes }}
+{% if tool.rate_limit %}
+RATE_LIMIT = {{ tool.rate_limit }}
+{% endif %}
+{% if tool.retry_policy %}
+RETRY_POLICY = {{ tool.retry_policy }}
+{% endif %}
+
+
+def call(**kwargs):
+    """{{ tool.description }}
+
+    type={{ tool.type }} sideEffects={{ tool.side_effects }} timeoutMs={{ tool.timeout_ms }}
+    """
+    return _impl.call(**kwargs)
+

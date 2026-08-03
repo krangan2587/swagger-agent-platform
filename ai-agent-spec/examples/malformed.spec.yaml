@@ -1,0 +1,14 @@
+specVersion: "0.1"
+
+info:
+  name: malformed-agent
+  version: 0.1.0
+  owner: some-team
+  description: This file has a YAML syntax error below
+  lifecycle: draft
+
+capabilities:
+  - id: do-a-thing
+    description: Does a thing
+      inputs: { type: object }
+    outputs: { type: object }

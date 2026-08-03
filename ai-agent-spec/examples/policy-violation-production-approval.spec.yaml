@@ -1,0 +1,53 @@
+# Schema-valid. Violates rule: production-requires-deployment-approval
+# (lifecycle=production, but deployment.approvalRequired is not true).
+
+specVersion: "0.1"
+
+info:
+  name: prod-no-approval-agent
+  version: 1.0.0
+  owner: some-team
+  description: Marked production without a deployment approval gate
+  lifecycle: production
+
+capabilities:
+  - id: do-a-thing
+    description: Does a thing
+    inputs: { type: object }
+    outputs: { type: object }
+
+tools: []
+
+dataContracts: []
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  promptTemplateRef: prompts/x.md
+  planningStrategy: single-shot
+
+guardrails:
+  contentPolicies: []
+  refusalConditions: []
+
+auth:
+  identityRef: svc-prod-no-approval-agent
+  credentialsRef: secretsmanager://prod-no-approval-agent/creds
+  scopesPerTool: {}
+
+observability:
+  logging: { level: info, destination: central-log-pipeline }
+  tracing: { enabled: true }
+  metrics: []
+  evalSuiteRef: evals/x.yaml
+
+errorHandling:
+  onToolFailure: abort
+  onTimeout: abort
+  onLowConfidence: abstain
+
+deployment:
+  environments: [production]
+  rolloutStrategy: direct
+  changeHistoryRef: registry/prod-no-approval-agent/CHANGELOG.md
+  approvalRequired: false

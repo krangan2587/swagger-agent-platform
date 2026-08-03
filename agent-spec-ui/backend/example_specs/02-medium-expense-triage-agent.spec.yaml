@@ -1,0 +1,174 @@
+# ============================================================================
+# DIFFICULTY: MEDIUM
+# Scenario: HR Expense Report Triage Agent
+#
+# What this proves, beyond the easy spec:
+#   - Two capabilities, two tools -- one read, one WRITE.
+#   - The write tool triggers policy rule "require-checkpoints-for-write-
+#     effects", so humanInLoop.checkpoints is required and present here.
+#   - A dataContract with piiPresent: true, so guardrails.piiHandling is
+#     required and present (policy rule 2).
+#   - Session-scoped memory (memory.type: session) -- proves the memory
+#     store binding gets generated.
+#   - guardrails.maxAutonomySteps is set, which alone would also trigger
+#     requires_human_approval in the IR even without the write tool.
+#   - retryPolicy + rateLimit on a tool, and an authRef-to-scopesPerTool
+#     resolution with two different tools/scopes.
+# ============================================================================
+
+specVersion: "0.1"
+
+info:
+  name: expense-report-triage-agent
+  version: 1.4.0
+  owner: hr-shared-services
+  description: >-
+    Reviews submitted expense reports against company travel & expense
+    policy, flags likely violations for a human reviewer, and drafts a
+    summary note explaining each flag. Never approves, rejects, or pays
+    a report itself.
+  lifecycle: pilot
+  tags: [hr, finance, expense-management]
+
+capabilities:
+  - id: triage-expense-report
+    description: >-
+      Review a submitted expense report's line items against policy and
+      produce a structured list of items that look non-compliant.
+    inputs:
+      type: object
+      required: [reportId]
+      properties:
+        reportId: { type: string }
+        employeeId: { type: string }
+    outputs:
+      type: object
+      required: [reportId, flags]
+      properties:
+        reportId: { type: string }
+        flags:
+          type: array
+          items:
+            type: object
+            properties:
+              lineItemId: { type: string }
+              reason: { type: string }
+              severity: { type: string }
+    scopeBoundaries: >-
+      Flags for human review only. Does not approve, reject, or modify
+      reimbursement amounts, and does not contact the employee directly.
+
+  - id: flag-report-for-review
+    description: >-
+      Mark a report as requiring manager review, attaching the triage
+      findings so the reviewer doesn't have to re-derive them.
+    inputs:
+      type: object
+      required: [reportId, flags]
+      properties:
+        reportId: { type: string }
+        flags: { type: array }
+    outputs:
+      type: object
+      required: [reportId, status]
+      properties:
+        reportId: { type: string }
+        status: { type: string }
+
+tools:
+  - id: get-expense-report
+    type: mcp
+    description: Retrieve a submitted expense report and its line items.
+    schema:
+      type: object
+      required: [reportId]
+      properties:
+        reportId: { type: string }
+    sideEffects: read
+    authRef: expense-read
+    timeoutMs: 6000
+
+  - id: flag-report-for-review-tool
+    type: mcp
+    description: Write a review flag onto an expense report in the expense system.
+    schema:
+      type: object
+      required: [reportId, flags]
+      properties:
+        reportId: { type: string }
+        flags: { type: array }
+    sideEffects: write
+    authRef: expense-write
+    timeoutMs: 10000
+    rateLimit:
+      maxCalls: 30
+      perSeconds: 60
+    retryPolicy:
+      maxRetries: 2
+      backoff: exponential
+
+dataContracts:
+  - source: expense-management-system
+    classification: confidential
+    allowedOperations: [read, write]
+    retention: 180d
+    fields: [reportId, employeeId, lineItems, amount, reviewStatus]
+    piiPresent: true
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  parameters: { temperature: 0.2, maxTokens: 1200 }
+  promptTemplateRef: prompts/expense-triage.md
+  planningStrategy: react
+
+memory:
+  type: session
+  scope: report-id
+  ttl: 2h
+
+guardrails:
+  contentPolicies: [no-approval-authority, no-employee-contact]
+  businessRules: [flag_threshold_usd_500, require_receipt_for_meals_over_75]
+  refusalConditions: [request_to_approve_report, request_outside_expense_scope]
+  maxAutonomySteps: 4
+  piiHandling: mask
+
+auth:
+  identityRef: svc-expense-triage-agent
+  credentialsRef: secretsmanager://expense-triage-agent/creds
+  scopesPerTool:
+    get-expense-report: [expense:read]
+    flag-report-for-review-tool: [expense:write]
+  tokenLifetimeSeconds: 1800
+
+humanInLoop:
+  checkpoints: [before_flag_written]
+  escalationPath: team:hr-expense-ops
+  overrideAuthority: role:expense-manager
+  approvalTimeoutBehavior: block
+
+observability:
+  logging:
+    level: info
+    destination: central-log-pipeline
+    fields: [report_id, employee_id, flag_count]
+  tracing:
+    enabled: true
+    propagation: w3c-tracecontext
+  metrics: [latency_ms, flags_per_report, tool_error_rate]
+  evalSuiteRef: evals/expense-report-triage-agent.yaml
+
+errorHandling:
+  onToolFailure: escalate
+  onTimeout: retry
+  onLowConfidence: escalate
+  fallbackResponse: "Unable to complete triage automatically -- routed to a human reviewer."
+  confidenceThreshold: 0.6
+
+deployment:
+  environments: [dev, staging]
+  rolloutStrategy: blue-green
+  compatibility: ">=0.1"
+  changeHistoryRef: registry/expense-report-triage-agent/CHANGELOG.md
+  approvalRequired: true

@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://internal/schemas/agent-spec-0.1.json",
+  "title": "AgentSpec",
+  "type": "object",
+  "required": [
+    "specVersion", "info", "capabilities", "tools",
+    "dataContracts", "model", "guardrails", "auth",
+    "observability", "errorHandling", "deployment"
+  ],
+  "properties": {
+    "specVersion": { "type": "string" },
+    "info": { "$ref": "#/$defs/Info" },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Capability" }
+    },
+    "tools": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Tool" }
+    },
+    "dataContracts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/DataContract" }
+    },
+    "model": { "$ref": "#/$defs/Model" },
+    "memory": { "$ref": "#/$defs/Memory" },
+    "guardrails": { "$ref": "#/$defs/Guardrails" },
+    "auth": { "$ref": "#/$defs/Auth" },
+    "humanInLoop": { "$ref": "#/$defs/HumanInLoop" },
+    "observability": { "$ref": "#/$defs/Observability" },
+    "errorHandling": { "$ref": "#/$defs/ErrorHandling" },
+    "deployment": { "$ref": "#/$defs/Deployment" }
+  },
+  "$defs": {
+    "Info": {
+      "type": "object",
+      "required": ["name", "version", "owner", "description", "lifecycle"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "version": { "type": "string" },
+        "owner": { "type": "string" },
+        "description": { "type": "string" },
+        "lifecycle": { "enum": ["draft", "pilot", "production", "deprecated"] },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Capability": {
+      "type": "object",
+      "required": ["id", "description", "inputs", "outputs"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "inputs": { "type": "object" },
+        "outputs": { "type": "object" },
+        "scopeBoundaries": { "type": "string" },
+        "examples": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "Tool": {
+      "type": "object",
+      "required": ["id", "type", "description", "schema", "sideEffects"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "enum": ["function", "http", "mcp"] },
+        "description": { "type": "string" },
+        "schema": { "type": "object" },
+        "sideEffects": { "enum": ["none", "read", "write", "irreversible"] },
+        "rateLimit": {
+          "type": "object",
+          "properties": {
+            "maxCalls": { "type": "integer" },
+            "perSeconds": { "type": "integer" }
+          }
+        },
+        "authRef": { "type": "string" },
+        "timeoutMs": { "type": "integer", "default": 30000 },
+        "retryPolicy": {
+          "type": "object",
+          "properties": {
+            "maxRetries": { "type": "integer" },
+            "backoff": { "enum": ["fixed", "exponential"] }
+          }
+        }
+      }
+    },
+    "DataContract": {
+      "type": "object",
+      "required": ["source", "classification", "allowedOperations", "retention"],
+      "properties": {
+        "source": { "type": "string" },
+        "classification": { "enum": ["public", "internal", "confidential", "restricted"] },
+        "allowedOperations": {
+          "type": "array",
+          "items": { "enum": ["read", "write", "delete"] }
+        },
+        "retention": { "type": "string" },
+        "fields": { "type": "array", "items": { "type": "string" } },
+        "piiPresent": { "type": "boolean", "default": false }
+      }
+    },
+    "Model": {
+      "type": "object",
+      "required": ["provider", "model", "promptTemplateRef", "planningStrategy"],
+      "properties": {
+        "provider": { "type": "string" },
+        "model": { "type": "string" },
+        "parameters": { "type": "object" },
+        "promptTemplateRef": { "type": "string" },
+        "planningStrategy": { "enum": ["single-shot", "react", "plan-execute"] },
+        "fallbackModel": { "type": "string" }
+      }
+    },
+    "Memory": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["none", "session", "long-term"], "default": "none" },
+        "scope": { "type": "string" },
+        "ttl": { "type": "string" },
+        "persistenceRef": { "type": "string" },
+        "maxSizeKb": { "type": "integer" }
+      }
+    },
+    "Guardrails": {
+      "type": "object",
+      "required": ["contentPolicies", "refusalConditions"],
+      "properties": {
+        "contentPolicies": { "type": "array", "items": { "type": "string" } },
+        "businessRules": { "type": "array", "items": { "type": "string" } },
+        "refusalConditions": { "type": "array", "items": { "type": "string" } },
+        "maxAutonomySteps": { "type": "integer" },
+        "piiHandling": { "enum": ["mask", "block", "allow-with-logging"] }
+      }
+    },
+    "Auth": {
+      "type": "object",
+      "required": ["identityRef", "credentialsRef", "scopesPerTool"],
+      "properties": {
+        "identityRef": { "type": "string" },
+        "credentialsRef": { "type": "string", "pattern": "^secretsmanager://" },
+        "scopesPerTool": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "tokenLifetimeSeconds": { "type": "integer", "default": 3600 }
+      }
+    },
+    "HumanInLoop": {
+      "type": "object",
+      "required": ["escalationPath", "overrideAuthority"],
+      "properties": {
+        "checkpoints": { "type": "array", "items": { "type": "string" } },
+        "escalationPath": { "type": "string" },
+        "overrideAuthority": { "type": "string" },
+        "approvalTimeoutBehavior": {
+          "enum": ["block", "proceed-with-log", "abort"],
+          "default": "block"
+        }
+      }
+    },
+    "Observability": {
+      "type": "object",
+      "required": ["logging", "tracing", "metrics", "evalSuiteRef"],
+      "properties": {
+        "logging": {
+          "type": "object",
+          "required": ["level", "destination"],
+          "properties": {
+            "level": { "enum": ["debug", "info", "warn", "error"] },
+            "destination": { "type": "string" },
+            "fields": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "tracing": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "propagation": { "type": "string" }
+          }
+        },
+        "metrics": { "type": "array", "items": { "type": "string" } },
+        "evalSuiteRef": { "type": "string" }
+      }
+    },
+    "ErrorHandling": {
+      "type": "object",
+      "required": ["onToolFailure", "onTimeout", "onLowConfidence"],
+      "properties": {
+        "onToolFailure": { "enum": ["retry", "fallback", "escalate", "abort"] },
+        "onTimeout": { "enum": ["retry", "fallback", "escalate", "abort"] },
+        "onLowConfidence": { "enum": ["fallback", "escalate", "abstain"] },
+        "fallbackResponse": { "type": "string" },
+        "confidenceThreshold": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "Deployment": {
+      "type": "object",
+      "required": ["environments", "rolloutStrategy", "changeHistoryRef"],
+      "properties": {
+        "environments": {
+          "type": "array",
+          "items": { "enum": ["dev", "staging", "production"] }
+        },
+        "rolloutStrategy": { "enum": ["canary", "blue-green", "direct"] },
+        "compatibility": { "type": "string" },
+        "changeHistoryRef": { "type": "string" },
+        "approvalRequired": { "type": "boolean" }
+      }
+    }
+  }
+}

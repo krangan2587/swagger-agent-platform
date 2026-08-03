@@ -1,0 +1,30 @@
+"""Generated capability handler for '{{ capability.id }}'.
+
+DO NOT EDIT BY HAND -- generated from the agent spec by the Template Engine
+(Stage 4, target: python-service). Re-run the generator instead.
+
+Your real implementation goes in
+src/impl/handlers/{{ capability.id | snake_case }}.py, NOT here. That file
+is scaffolded once and never overwritten by the generator.
+"""
+
+from __future__ import annotations
+
+from src.impl.handlers import {{ capability.id | snake_case }} as _impl
+
+CAPABILITY_ID = "{{ capability.id }}"
+INPUTS_SUMMARY = "{{ capability.inputs_summary }}"
+OUTPUTS_SUMMARY = "{{ capability.outputs_summary }}"
+{% if capability.scope_boundaries %}
+SCOPE_BOUNDARIES = "{{ capability.scope_boundaries }}"
+{% endif %}
+
+
+def handle(input_data: dict) -> dict:
+    """{{ capability.description }}
+
+    Inputs : {{ capability.inputs_summary }}
+    Outputs: {{ capability.outputs_summary }}
+    """
+    return _impl.handle(input_data)
+

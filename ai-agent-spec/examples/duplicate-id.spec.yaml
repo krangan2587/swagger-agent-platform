@@ -1,0 +1,59 @@
+specVersion: "0.1"
+
+info:
+  name: dup-id-agent
+  version: 0.1.0
+  owner: some-team
+  description: Has two tools with the same id
+  lifecycle: draft
+
+capabilities:
+  - id: do-a-thing
+    description: Does a thing
+    inputs: { type: object }
+    outputs: { type: object }
+
+tools:
+  - id: get-customer-profile
+    type: mcp
+    description: First tool
+    schema: { type: object }
+    sideEffects: read
+  - id: get-customer-profile
+    type: http
+    description: Second tool, same id as the first — should fail parsing
+    schema: { type: object }
+    sideEffects: read
+
+dataContracts: []
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  promptTemplateRef: prompts/x.md
+  planningStrategy: single-shot
+
+guardrails:
+  contentPolicies: []
+  refusalConditions: []
+
+auth:
+  identityRef: svc-dup-id-agent
+  credentialsRef: secretsmanager://dup-id-agent/creds
+  scopesPerTool: {}
+
+observability:
+  logging: { level: info, destination: central-log-pipeline }
+  tracing: { enabled: true }
+  metrics: []
+  evalSuiteRef: evals/dup.yaml
+
+errorHandling:
+  onToolFailure: abort
+  onTimeout: abort
+  onLowConfidence: abstain
+
+deployment:
+  environments: [dev]
+  rolloutStrategy: direct
+  changeHistoryRef: registry/dup-id-agent/CHANGELOG.md

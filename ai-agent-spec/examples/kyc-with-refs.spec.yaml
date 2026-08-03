@@ -1,0 +1,67 @@
+# Same as kyc-refresh-agent.spec.yaml, but capabilities[0]'s inputs/outputs
+# use file-relative $refs instead of inline schemas — this is what
+# Section 7.1's "resolve every $ref" step actually resolves.
+
+specVersion: "0.1"
+
+info:
+  name: kyc-refresh-agent
+  version: 1.2.0
+  owner: retail-banking-platform
+  description: Assists analysts in refreshing customer KYC records
+  lifecycle: pilot
+  tags: [kyc, retail-banking]
+
+capabilities:
+  - id: summarize-kyc-gaps
+    description: Identify missing or expired KYC fields for a customer
+    inputs: { $ref: schemas/kyc-input.json }
+    outputs: { $ref: schemas/kyc-gap-report.json }
+
+tools:
+  - id: get-customer-profile
+    type: mcp
+    description: Retrieve a customer's current KYC record
+    schema: { type: object }
+    sideEffects: read
+    authRef: kyc-read
+
+dataContracts:
+  - source: core-banking-crm
+    classification: confidential
+    allowedOperations: [read]
+    retention: 90d
+    piiPresent: true
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  promptTemplateRef: prompts/kyc-refresh.md
+  planningStrategy: plan-execute
+
+guardrails:
+  contentPolicies: [no-financial-advice]
+  refusalConditions: [request_outside_kyc_scope]
+  piiHandling: mask
+
+auth:
+  identityRef: svc-kyc-refresh-agent
+  credentialsRef: secretsmanager://kyc-refresh-agent/creds
+  scopesPerTool:
+    get-customer-profile: [kyc:read]
+
+observability:
+  logging: { level: info, destination: central-log-pipeline }
+  tracing: { enabled: true }
+  metrics: [latency_ms]
+  evalSuiteRef: evals/kyc-refresh-agent.yaml
+
+errorHandling:
+  onToolFailure: escalate
+  onTimeout: retry
+  onLowConfidence: abstain
+
+deployment:
+  environments: [dev, staging]
+  rolloutStrategy: canary
+  changeHistoryRef: registry/kyc-refresh-agent/CHANGELOG.md

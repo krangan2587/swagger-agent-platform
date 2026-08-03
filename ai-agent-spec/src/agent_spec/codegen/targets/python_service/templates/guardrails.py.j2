@@ -1,0 +1,34 @@
+"""Generated guardrail enforcement hooks.
+
+DO NOT EDIT BY HAND -- generated from the agent spec's guardrails section by
+the Template Engine (Stage 4, target: python-service).
+"""
+
+from __future__ import annotations
+
+CONTENT_POLICIES = {{ ir.guardrails.content_policies }}
+BUSINESS_RULES = {{ ir.guardrails.business_rules }}
+REFUSAL_CONDITIONS = {{ ir.guardrails.refusal_conditions }}
+{% if ir.guardrails.max_autonomy_steps is not none %}
+MAX_AUTONOMY_STEPS = {{ ir.guardrails.max_autonomy_steps }}
+{% endif %}
+{% if ir.guardrails.pii_handling %}
+PII_HANDLING = "{{ ir.guardrails.pii_handling }}"
+{% endif %}
+
+# Derived in the IR Builder (Stage 3) from write/irreversible tools and/or
+# an autonomy-step ceiling -- see AgentIR.requires_human_approval.
+REQUIRES_HUMAN_APPROVAL = {{ ir.requires_human_approval }}
+
+
+def check_refusal(request: dict) -> str | None:
+    """Return a refusal reason if `request` matches a refusal condition,
+    otherwise None. TODO: wire each entry in REFUSAL_CONDITIONS to real
+    detection logic."""
+    return None
+
+
+def enforce_pii_handling(payload: dict) -> dict:
+    """Apply PII_HANDLING to `payload` before it leaves the agent.
+    TODO: implement based on PII_HANDLING's value."""
+    return payload

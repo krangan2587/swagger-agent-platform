@@ -1,0 +1,58 @@
+# Schema-valid. Violates rule: require-pii-handling-for-pii-data
+# (piiPresent=true, but guardrails.piiHandling is never set).
+
+specVersion: "0.1"
+
+info:
+  name: pii-no-handling-agent
+  version: 0.1.0
+  owner: some-team
+  description: Reads PII but declares no piiHandling strategy
+  lifecycle: pilot
+
+capabilities:
+  - id: summarize-record
+    description: Summarizes a customer record
+    inputs: { type: object }
+    outputs: { type: object }
+
+tools: []
+
+dataContracts:
+  - source: core-banking-crm
+    classification: confidential
+    allowedOperations: [read]
+    retention: 90d
+    piiPresent: true
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  promptTemplateRef: prompts/x.md
+  planningStrategy: single-shot
+
+guardrails:
+  contentPolicies: []
+  refusalConditions: []
+  # piiHandling intentionally omitted
+
+auth:
+  identityRef: svc-pii-no-handling-agent
+  credentialsRef: secretsmanager://pii-no-handling-agent/creds
+  scopesPerTool: {}
+
+observability:
+  logging: { level: info, destination: central-log-pipeline }
+  tracing: { enabled: true }
+  metrics: []
+  evalSuiteRef: evals/x.yaml
+
+errorHandling:
+  onToolFailure: abort
+  onTimeout: abort
+  onLowConfidence: abstain
+
+deployment:
+  environments: [dev]
+  rolloutStrategy: direct
+  changeHistoryRef: registry/pii-no-handling-agent/CHANGELOG.md

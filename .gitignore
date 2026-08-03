@@ -1,0 +1,16 @@
+.venv/
+venv/
+mcp-venv/
+
+__pycache__/
+*.pyc
+
+node_modules/
+
+.env
+
+.vscode/
+.idea/
+
+dist/
+build/

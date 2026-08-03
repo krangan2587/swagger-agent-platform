@@ -1,0 +1,27 @@
+[
+  {
+    "template": "tool_binding.py.j2",
+    "output_path": "src/tools/{{ tool.id | snake_case }}.py",
+    "iterate_over": "tools",
+    "item_name": "tool"
+  },
+  {
+    "template": "handler.py.j2",
+    "output_path": "src/handlers/{{ capability.id | snake_case }}.py",
+    "iterate_over": "capabilities",
+    "item_name": "capability"
+  },
+  {
+    "template": "guardrails.py.j2",
+    "output_path": "src/guardrails/policy_hooks.py"
+  },
+  {
+    "template": "prompt.py.j2",
+    "output_path": "src/prompts/{{ ir.model.prompt_template_ref | ref_stem | snake_case }}.py"
+  },
+  {
+    "template": "memory_store.py.j2",
+    "output_path": "src/memory/session_store.py",
+    "when": "has_memory"
+  }
+]

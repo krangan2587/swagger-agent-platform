@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fraud-investigation-agent — Reference</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; max-width: 900px;
+         margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; line-height: 1.5; }
+  h1 { border-bottom: 2px solid #ddd; padding-bottom: .5rem; }
+  h2 { margin-top: 2rem; color: #333; }
+  table { border-collapse: collapse; width: 100%; margin: .5rem 0 1.5rem; }
+  th, td { border: 1px solid #ddd; padding: .4rem .6rem; text-align: left; font-size: .9rem; }
+  th { background: #f5f5f5; }
+  .badge { display: inline-block; background: #eef2ff; border-radius: 4px;
+           padding: .1rem .6rem; font-size: .8rem; margin-right: .3rem; }
+  code { background: #f5f5f5; padding: .1rem .3rem; border-radius: 3px; }
+  footer { color: #888; font-size: .85rem; margin-top: 3rem; }
+</style>
+</head>
+<body>
+
+<h1>fraud-investigation-agent
+  <span class="badge">v2.3.1</span>
+  <span class="badge">production</span>
+</h1>
+<p>Assists fraud analysts investigating flagged transactions: gathers transaction history and risk signals, drafts a case narrative, and recommends a disposition. All account actions (freezes, holds, escalations) require analyst approval before execution.</p>
+<ul><li><strong>Owner:</strong> fraud-risk-engineering</li><li><strong>Tags:</strong> fraud, risk, case-management, regulated</li><li><strong>Human approval required:</strong> True</li></ul>
+
+<h2>Capabilities</h2>
+<table><thead><tr><th>id</th><th>description</th><th>inputs</th><th>outputs</th><th>scope boundaries</th></tr></thead><tbody><tr><td>summarize-alert</td><td>Summarize a fraud-detection alert in plain language for the assigned analyst, including why it fired and its severity.</td><td>{ alertId: string }</td><td>{ alertId: string, summary: string, severity: string }</td><td>Summarization only -- does not determine disposition.</td></tr><tr><td>gather-evidence</td><td>Pull transaction history and the customer&#x27;s current risk profile relevant to the flagged alert into a single evidence packet.</td><td>{ alertId: string, customerId: string }</td><td>{ alertId: string, transactions: array, riskProfile: object }</td><td>—</td></tr><tr><td>draft-case-narrative</td><td>Draft a written case narrative from gathered evidence, in the format required for the case management system.</td><td>{ alertId: string, transactions: array, riskProfile: object }</td><td>{ alertId: string, narrative: string }</td><td>—</td></tr><tr><td>recommend-disposition</td><td>Recommend a disposition (e.g. escalate, monitor, close) for the case, with a confidence score and supporting rationale. Does not execute the disposition.</td><td>{ alertId: string, narrative: string }</td><td>{ alertId: string, recommendation: string, confidence: number }</td><td>A recommendation only. Escalation and account actions require a human analyst to invoke them explicitly.</td></tr></tbody></table>
+
+<h2>Tools</h2>
+<table><thead><tr><th>id</th><th>type</th><th>side effects</th><th>auth scopes</th><th>timeout (ms)</th></tr></thead><tbody><tr><td>get-transaction-history</td><td>mcp</td><td>read</td><td>fraud:read, txn:read</td><td>8000</td></tr><tr><td>get-customer-risk-profile</td><td>http</td><td>read</td><td>risk:read</td><td>5000</td></tr><tr><td>create-case-record</td><td>mcp</td><td>write</td><td>case:write</td><td>12000</td></tr><tr><td>escalate-to-investigator</td><td>http</td><td>irreversible</td><td>case:escalate</td><td>10000</td></tr></tbody></table>
+
+<h2>Data Contracts</h2>
+<table><thead><tr><th>source</th><th>classification</th><th>allowed operations</th><th>retention</th><th>PII present</th></tr></thead><tbody><tr><td>core-banking-crm</td><td>confidential</td><td>read</td><td>90d</td><td>True</td></tr><tr><td>fraud-case-management-system</td><td>restricted</td><td>read, write</td><td>2555d</td><td>True</td></tr><tr><td>customer-risk-signals</td><td>confidential</td><td>read</td><td>365d</td><td>False</td></tr></tbody></table>
+
+<h2>Model</h2>
+<ul><li><strong>Provider:</strong> internal-model-gateway</li><li><strong>Model:</strong> enterprise-llm-v2-large</li><li><strong>Planning strategy:</strong> plan-execute</li><li><strong>Prompt template ref:</strong> prompts/fraud-investigation.md</li></ul>
+
+<h2>Memory</h2>
+<ul><li><strong>Type:</strong> long-term</li><li><strong>Scope:</strong> case-id</li><li><strong>TTL:</strong> 2555d</li></ul>
+<h2>Guardrails</h2>
+<ul><li><strong>Content policies:</strong> no-account-freeze-without-approval, no-customer-contact, confidentiality-required</li><li><strong>Refusal conditions:</strong> request_to_execute_account_action, request_outside_fraud_scope, request_for_unmasked_pii</li><li><strong>Max autonomy steps:</strong> 8</li><li><strong>PII handling:</strong> mask</li></ul>
+
+<h2>Human in the Loop</h2>
+<ul><li><strong>Checkpoints:</strong> before_case_record_created, before_escalation</li><li><strong>Escalation path:</strong> team:fraud-senior-investigators</li><li><strong>Override authority:</strong> role:fraud-team-lead</li><li><strong>Approval timeout behavior:</strong> abort</li></ul>
+<h2>Deployment</h2>
+<ul><li><strong>Environments:</strong> dev, staging, production</li><li><strong>Rollout strategy:</strong> canary</li><li><strong>Approval required:</strong> True</li></ul>
+
+<footer>Generated live from the agent's IR by the Output Packager (Stage 5) —
+this page cannot drift from what was actually built.</footer>
+</body>
+</html>

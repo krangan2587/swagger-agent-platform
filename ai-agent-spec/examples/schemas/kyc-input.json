@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "required": ["customerId"],
+  "properties": {
+    "customerId": { "type": "string", "description": "Internal customer identifier" },
+    "asOfDate": { "type": "string", "format": "date" }
+  }
+}

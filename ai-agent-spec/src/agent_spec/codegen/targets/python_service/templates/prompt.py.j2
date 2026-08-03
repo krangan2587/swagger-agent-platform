@@ -1,0 +1,23 @@
+"""Generated prompt loader for model.promptTemplateRef.
+
+DO NOT EDIT BY HAND -- generated from the agent spec's model section by the
+Template Engine (Stage 4, target: python-service).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+PROMPT_TEMPLATE_REF = "{{ ir.model.prompt_template_ref }}"
+PLANNING_STRATEGY = "{{ ir.model.planning_strategy }}"
+MODEL_PROVIDER = "{{ ir.model.provider }}"
+MODEL_ID = "{{ ir.model.model }}"
+
+
+def load_prompt_template() -> str:
+    """Load the versioned prompt template this agent references.
+
+    TODO: point this at your real template store (this stub reads
+    PROMPT_TEMPLATE_REF as a local file path relative to the deployed agent).
+    """
+    return Path(PROMPT_TEMPLATE_REF).read_text(encoding="utf-8")

@@ -1,0 +1,228 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", sans-serif;
+  background: #0f1117;
+  color: #e4e6eb;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+header h1 {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  color: #9aa0ab;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.spec-editor {
+  border: 1px solid #2a2e37;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  background: #171a21;
+  border-bottom: 1px solid #2a2e37;
+  flex-wrap: wrap;
+}
+
+.toolbar select,
+.toolbar .output-folder-input,
+.upload-button {
+  background: #21252e;
+  color: #e4e6eb;
+  border: 1px solid #363b47;
+  border-radius: 5px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.output-folder-input {
+  cursor: text;
+  min-width: 180px;
+}
+
+.spec-textarea {
+  width: 100%;
+  min-height: 360px;
+  background: #0d0f14;
+  color: #d8dce3;
+  border: none;
+  padding: 1rem;
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.generate-button {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  background: #4f7cff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 1.5rem;
+}
+
+.generate-button:disabled {
+  background: #333844;
+  cursor: not-allowed;
+}
+
+.fatal-error,
+.failure-banner {
+  background: #3a1d1f;
+  border: 1px solid #7a2f33;
+  color: #ff9d9d;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.step-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+  border: 1px solid #2a2e37;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #21242c;
+  font-size: 0.9rem;
+}
+
+.step:last-child {
+  border-bottom: none;
+}
+
+.step-icon {
+  font-size: 1.1rem;
+  width: 1.2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.step-pending {
+  color: #666b76;
+}
+.step-running .step-icon {
+  color: #f5c451;
+  animation: spin 1s linear infinite;
+}
+.step-success .step-icon {
+  color: #4fd48c;
+}
+.step-error .step-icon,
+.step-error .step-label {
+  color: #ff6b6b;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.step-body {
+  flex: 1;
+}
+
+.step-label {
+  font-weight: 500;
+}
+
+.step-detail {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #9aa0ab;
+}
+
+.step-detail ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  color: #ff9d9d;
+}
+
+.result-panel {
+  border: 1px solid #2f5c42;
+  background: #10241a;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.result-panel h3 {
+  margin-top: 0;
+  color: #4fd48c;
+}
+
+.result-panel dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.3rem 1rem;
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+.result-panel dt {
+  color: #9aa0ab;
+}
+
+.result-panel code {
+  background: #1a1f28;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.download-button {
+  display: inline-block;
+  background: #4f7cff;
+  color: white;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.file-list {
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 0.8rem;
+  color: #9aa0ab;
+  max-height: 220px;
+  overflow-y: auto;
+}

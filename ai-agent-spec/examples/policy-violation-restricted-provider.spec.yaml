@@ -1,0 +1,56 @@
+# Schema-valid. Violates rule: restricted-data-requires-approved-provider
+# (a restricted-classification dataContract, but model.provider isn't approved).
+
+specVersion: "0.1"
+
+info:
+  name: restricted-bad-provider-agent
+  version: 0.1.0
+  owner: some-team
+  description: Touches restricted data via an unapproved model provider
+  lifecycle: pilot
+
+capabilities:
+  - id: read-restricted-record
+    description: Reads a restricted-classification record
+    inputs: { type: object }
+    outputs: { type: object }
+
+tools: []
+
+dataContracts:
+  - source: sensitive-vault
+    classification: restricted
+    allowedOperations: [read]
+    retention: 30d
+
+model:
+  provider: some-unapproved-vendor
+  model: random-model-v1
+  promptTemplateRef: prompts/x.md
+  planningStrategy: single-shot
+
+guardrails:
+  contentPolicies: []
+  refusalConditions: []
+
+auth:
+  identityRef: svc-restricted-bad-provider-agent
+  credentialsRef: secretsmanager://restricted-bad-provider-agent/creds
+  scopesPerTool: {}
+
+observability:
+  logging: { level: info, destination: central-log-pipeline }
+  tracing: { enabled: true }
+  metrics: []
+  evalSuiteRef: evals/x.yaml
+
+errorHandling:
+  onToolFailure: abort
+  onTimeout: abort
+  onLowConfidence: abstain
+
+deployment:
+  environments: [dev]
+  rolloutStrategy: direct
+  changeHistoryRef: registry/restricted-bad-provider-agent/CHANGELOG.md

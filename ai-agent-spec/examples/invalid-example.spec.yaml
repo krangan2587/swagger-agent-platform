@@ -1,0 +1,59 @@
+# Intentionally broken in three ways, to prove the validator catches each:
+#   1. info.lifecycle uses a value outside the enum ("testing")
+#   2. tools[0].sideEffects is missing entirely (required field)
+#   3. auth.credentialsRef doesn't match the secretsmanager:// pattern
+
+specVersion: "0.1"
+
+info:
+  name: broken-agent
+  version: 0.1.0
+  owner: some-team
+  description: A spec with deliberate schema violations
+  lifecycle: testing   # (1) not one of draft|pilot|production|deprecated
+
+capabilities:
+  - id: do-a-thing
+    description: Does a thing
+    inputs: { type: object }
+    outputs: { type: object }
+
+tools:
+  - id: some-tool
+    type: mcp
+    description: A tool missing its required sideEffects field
+    schema: { type: object }
+    # (2) sideEffects is required but missing
+
+dataContracts: []
+
+model:
+  provider: internal-model-gateway
+  model: enterprise-llm-v2
+  promptTemplateRef: prompts/broken.md
+  planningStrategy: single-shot
+
+guardrails:
+  contentPolicies: []
+  refusalConditions: []
+
+auth:
+  identityRef: svc-broken-agent
+  credentialsRef: "plaintext-secret-not-allowed"   # (3) must start with secretsmanager://
+  scopesPerTool: {}
+
+observability:
+  logging: { level: info, destination: central-log-pipeline }
+  tracing: { enabled: true }
+  metrics: []
+  evalSuiteRef: evals/broken.yaml
+
+errorHandling:
+  onToolFailure: abort
+  onTimeout: abort
+  onLowConfidence: abstain
+
+deployment:
+  environments: [dev]
+  rolloutStrategy: direct
+  changeHistoryRef: registry/broken-agent/CHANGELOG.md
